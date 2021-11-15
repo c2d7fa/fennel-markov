@@ -1,0 +1,38 @@
+(local fennel (require :fennel))
+
+(fn p [x]
+  (print (fennel.view x)))
+
+(lambda keys [t]
+  (icollect [k v (pairs t)] k))
+
+(lambda vals [t]
+  (icollect [k v (pairs t)] v))
+
+(lambda sum [xs]
+  (accumulate [result 0
+               x (vals xs)]
+    (+ result x)))
+
+(lambda sorted-pairs [t]
+  (local sorted-keys (keys t))
+  (table.sort sorted-keys)
+  (var i 1)
+  (lambda []
+    (let [k (. sorted-keys i)
+          v (. t k)]
+      (set i (+ i 1))
+      (when k (values k v)))))
+
+(lambda resolve [ps u]
+  (.
+    (accumulate [[r s] [nil 0]
+                  k v (sorted-pairs ps)]
+      (if (>= (+ s v) u)
+        (if (= nil r)
+          [k (+ s v)]
+          [r (+ s v)])
+        [nil (+ s v)]))
+    1))
+
+(p (resolve {:a 0.1 :b 0.1} 0.15))
