@@ -70,9 +70,27 @@
         c))))
 
 (lambda register-word [obs word]
-  (register-observations obs
-                         (icollect [c (chars word)] c)))
+  (register-observations
+    obs
+    (icollect [c (chars word)] c)))
 
-(local example (register-word {} "aaaab"))
-(p (probabilities-given example :a))
+(lambda split-words [s]
+  (var words [])
+  (var word "")
+  (icollect [c (chars s)]
+    (if (= " " c)
+      (when (not (= "" word))
+        (table.insert words word)
+        (set word ""))
+      (set word (.. word c))))
+  (when (not (= "" word))
+    (table.insert words word))
+  words)
+
+(lambda register-words [obs s]
+  (accumulate [obs {}
+               _ word (ipairs (split-words s))]
+    (register-word obs word)))
+
+(p (register-words {} "the cat sat on the mat"))
 
