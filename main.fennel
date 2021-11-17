@@ -61,6 +61,18 @@
           [(register-observation obs1 s x) x])]
     (register-observation obs1 s :.)))
 
-(local example (register-observations {} [:a :a :a :b]))
+(lambda chars [s]
+  (var i 1)
+  (lambda []
+    (let [c (s:sub i i)]
+      (when (<= i (length s))
+        (set i (+ i 1))
+        c))))
+
+(lambda register-word [obs word]
+  (register-observations obs
+                         (icollect [c (chars word)] c)))
+
+(local example (register-word {} "aaaab"))
 (p (probabilities-given example :a))
 
