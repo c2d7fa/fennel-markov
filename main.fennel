@@ -47,13 +47,20 @@
          (values k (/ v (total-observations-for a-obs))))
       {})))
 
-(local example-observations
- {:a {:a 3
-      :b 8}
-  :b {:b 3
-      :. 1}
-  :c {:a 1}})
+(lambda register-observation [obs s x]
+  ;; [TODO] Don't mutate the table directly
+  (if (not (. obs s))
+    (tset obs s {x 1})
+    (tset (. obs s) x (+ 1 (or (. obs s x) 0))))
+  obs)
 
-(p (resolve (probabilities-given example-observations :b)
-            0.5))
+(lambda register-observations [obs xs]
+  (let [[obs1 s]
+        (accumulate [[obs1 s] [obs :.]
+                     _ x (ipairs xs)]
+          [(register-observation obs1 s x) x])]
+    (register-observation obs1 s :.)))
+
+(local example (register-observations {} [:a :a :a :b]))
+(p (probabilities-given example :a))
 
