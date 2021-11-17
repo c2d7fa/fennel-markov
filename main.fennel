@@ -1,17 +1,15 @@
 (local fennel (require :fennel))
 
 (fn p [x]
-  (print (fennel.view x)))
+  (print (fennel.view x))
+  x)
 
 (lambda keys [t]
   (icollect [k v (pairs t)] k))
 
-(lambda vals [t]
-  (icollect [k v (pairs t)] v))
-
 (lambda sum [xs]
   (accumulate [result 0
-               x (vals xs)]
+               _ x (ipairs xs)]
     (+ result x)))
 
 (lambda sorted-pairs [t]
@@ -35,4 +33,27 @@
         [nil (+ s v)]))
     1))
 
-(p (resolve {:a 0.1 :b 0.1} 0.15))
+(lambda total-observations-for [obs-a]
+  (sum (icollect [_ v (pairs obs-a)] v)))
+
+(lambda total-observations [obs]
+  (sum (icollect [_ v1 (pairs obs)]
+          (total-observations-for v1))))
+
+(lambda probabilities-given [obs a]
+  (let [a-obs (. obs a)]
+    (if a-obs
+      (collect [k v (pairs a-obs)]
+         (values k (/ v (total-observations-for a-obs))))
+      {})))
+
+(local example-observations
+ {:a {:a 3
+      :b 8}
+  :b {:b 3
+      :. 1}
+  :c {:a 1}})
+
+(p (resolve (probabilities-given example-observations :b)
+            0.5))
+
