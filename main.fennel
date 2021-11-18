@@ -4,6 +4,47 @@
   (print (fennel.view x))
   x)
 
+(lambda shallow-copy [t]
+  (collect [k v (pairs t)] k v))
+
+(macro with-copy [[copy original] ...]
+  `(let [,copy (shallow-copy ,original)]
+     ,...
+     ,copy))
+
+(macro def-copying [name f]
+  `(local ,name (lambda [t# ...]
+                  (with-copy [u# t#]
+                     (,f u# ...)))))
+
+(def-copying sorted table.sort)
+(def-copying inserted table.insert)
+
+(lambda merged [?t u]
+  (if ?t
+    (with-copy [t1 ?t]
+      (each [k v (pairs u)]
+        (tset t1 k v)))
+    (shallow-copy u)))
+
+(lambda update [?t k f]
+  (merged ?t {k (f (if ?t (. ?t k) nil))}))
+
+(lambda empty? [seq]
+  (= 0 (length seq)))
+
+(lambda drop [seq n]
+  (var result [])
+  (for [i (+ n 1) (length seq)]
+    (table.insert result (. seq i)))
+  result)
+
+(lambda update-in [?t ks f]
+  (if (empty? ks)
+    (f ?t)
+    (update ?t (. ks 1) (lambda [?t]
+                         (update-in ?t (drop ks 1) f)))))
+
 (lambda keys [t]
   (icollect [k v (pairs t)] k))
 
@@ -12,80 +53,70 @@
                _ x (ipairs xs)]
     (+ result x)))
 
-(lambda sorted-pairs [t]
-  (local sorted-keys (keys t))
-  (table.sort sorted-keys)
-  (var i 1)
-  (lambda []
-    (let [k (. sorted-keys i)
-          v (. t k)]
-      (set i (+ i 1))
-      (when k (values k v)))))
+(lambda pairs/sorted [t]
+  (let [sorted-keys (sorted (keys t))]
+    (local iterator (ipairs sorted-keys))
+    (lambda []
+      (let [(k v) (iterator)]
+        (. t v)))))
+
+(lambda map [f seq]
+  (icollect [k v (ipairs seq)]
+    (f v k)))
+
+(lambda vals [t]
+  (icollect [k v (pairs t)] v))
+
+;;
 
 (lambda resolve [ps u]
-  (.
-    (accumulate [[r s] [nil 0]
-                  k v (sorted-pairs ps)]
-      (if (>= (+ s v) u)
-        (if (= nil r)
-          [k (+ s v)]
-          [r (+ s v)])
-        [nil (+ s v)]))
-    1))
+  (-> (accumulate [[r s] [nil 0]
+                    k v (pairs/sorted ps)]
+        (if (>= (+ s v) u)
+          (if (= nil r)
+            [k (+ s v)]
+            [r (+ s v)])
+          [nil (+ s v)]))
+      (. 1)))
 
 (lambda total-observations-for [obs-a]
-  (sum (icollect [_ v (pairs obs-a)] v)))
+  (sum (vals obs-a)))
 
 (lambda total-observations [obs]
-  (sum (icollect [_ v1 (pairs obs)]
-          (total-observations-for v1))))
+  (sum (map total-observations-for obs)))
 
-(lambda probabilities-given [obs a]
-  (let [a-obs (. obs a)]
-    (if a-obs
-      (collect [k v (pairs a-obs)]
-         (values k (/ v (total-observations-for a-obs))))
-      {})))
+(lambda probabilities [obs]
+  (collect [k v (pairs obs)]
+     k (/ v (total-observations-for obs))))
 
 (lambda register-observation [obs s x]
-  ;; [TODO] Don't mutate the table directly
-  (if (not (. obs s))
-    (tset obs s {x 1})
-    (tset (. obs s) x (+ 1 (or (. obs s x) 0))))
-  obs)
+  (update-in obs [s x] #(+ 1 (or $1 0))))
 
 (lambda register-observations [obs xs]
-  (let [[obs1 s]
-        (accumulate [[obs1 s] [obs :.]
-                     _ x (ipairs xs)]
-          [(register-observation obs1 s x) x])]
-    (register-observation obs1 s :.)))
+  (-> (accumulate [[obs s] [obs :.]
+                   _ x (ipairs (inserted xs :.))]
+        [(register-observation obs s x) x])
+      (. 1)))
 
 (lambda chars [s]
-  (var i 1)
-  (lambda []
-    (let [c (s:sub i i)]
-      (when (<= i (length s))
-        (set i (+ i 1))
-        c))))
+  (local result [])
+  (for [i 1 (length s)]
+    (table.insert result (s:sub i i)))
+  result)
 
 (lambda register-word [obs word]
-  (register-observations
-    obs
-    (icollect [c (chars word)] c)))
+  (register-observations obs (chars word)))
 
 (lambda split-words [s]
-  (var words [])
-  (var word "")
-  (icollect [c (chars s)]
-    (if (= " " c)
-      (when (not (= "" word))
-        (table.insert words word)
-        (set word ""))
-      (set word (.. word c))))
-  (when (not (= "" word))
-    (table.insert words word))
-  words)
+  (-> (accumulate [[words buffer] [[] ""]
+                   _ c (ipairs (chars s))]
+        (if (= " " c)
+          [(if (not (= "" buffer))
+              (inserted words buffer)
+              buffer)
+           ""]
+          [words (.. buffer c)]))
+      (#(inserted (. $1 1) (. $1 2)))))
 
 (lambda register-words [obs s]
   (accumulate [obs {}
