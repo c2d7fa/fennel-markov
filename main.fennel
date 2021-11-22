@@ -165,5 +165,6 @@
   (lambda []
     (math.random)))
 
-(p (walk-string "the cat sat on the mat" randoms))
+(local words (io.read :*a))
+(p (walk-string words randoms))
 
