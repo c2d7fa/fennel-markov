@@ -39,6 +39,15 @@
     (table.insert result (. seq i)))
   result)
 
+(lambda take [seq n]
+  (var result [])
+  (for [i 1 (math.min (length seq) n)]
+    (table.insert result (. seq i)))
+  result)
+
+(lambda drop-last [seq n]
+  (take seq (- (length seq) n)))
+
 (lambda update-in [?t ks f]
   (if (empty? ks)
     (f ?t)
@@ -54,11 +63,16 @@
     (+ result x)))
 
 (lambda pairs/sorted [t]
-  (let [sorted-keys (sorted (keys t))]
-    (local iterator (ipairs sorted-keys))
-    (lambda []
-      (let [(k v) (iterator)]
-        (. t v)))))
+  (local sorted-keys (sorted (keys t)))
+  (var i 1)
+  (lambda []
+    (if (> i (length sorted-keys))
+      nil
+      (do
+        (let [j i]
+          (set i (+ i 1))
+          (values (. sorted-keys j)
+                  (. t (. sorted-keys j))))))))
 
 (lambda map [f seq]
   (icollect [k v (ipairs seq)]
@@ -118,10 +132,38 @@
           [words (.. buffer c)]))
       (#(inserted (. $1 1) (. $1 2)))))
 
+(lambda join [ss]
+  (var result "")
+  (each [_ c (ipairs ss)]
+    (set result (.. result c)))
+  result)
+
 (lambda register-words [obs s]
   (accumulate [obs {}
                _ word (ipairs (split-words s))]
     (register-word obs word)))
 
-(p (register-words {} "the cat sat on the mat"))
+(lambda step [obs previous outcome]
+  (resolve (probabilities (. obs previous)) outcome))
+
+(lambda walk [obs outcome-iterator]
+  (->
+    (accumulate [[result previous] [[] :.]
+                 outcome (outcome-iterator)
+                 :until (and (= previous :.)
+                             (not (empty? result)))]
+      (let [current (step obs previous outcome)]
+        [(inserted result current) current]))
+    (. 1)
+    (drop-last 1)))
+
+(lambda walk-string [input outcome-iterator]
+  (join (walk (register-words {} input) outcome-iterator)))
+
+(lambda randoms []
+  (math.randomseed (os.time))
+  (lambda []
+    (math.random)))
+
+(p (walk-string "the cat sat on the mat" randoms))
 
