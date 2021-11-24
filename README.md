@@ -3,7 +3,7 @@
 A simple Markov chain generator in Fennel. To use it, place a list of
 space-separated words in `words`, and then run:
 
-    $ fennel main.fennel <words
+    $ fennel main.fnl <words
 
 The program will then generate a new word that looks like one of the words in
 the file.
